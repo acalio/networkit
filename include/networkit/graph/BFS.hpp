@@ -64,6 +64,65 @@ void BFSfrom(const Graph &G, InputIt first, InputIt last, L handle) {
     } while (!q.empty());
 }
 
+
+/**
+ * Iterate over nodes in breadth-first search order starting from the nodes within the given range
+ * until a given depth limit is reached.
+ *
+ * @param G The input graph.
+ * @param first The first element of the range.
+ * @param last The end of the range.
+ * @param limit Depth Limit
+ * @param handle Takes a node as input parameter.
+ */
+template <class InputIt, typename L>
+void BFSfromWithLimit(const Graph &G, InputIt first, InputIt last, int limit,  L handle) {
+    std::vector<bool> marked(G.upperNodeIdBound());
+    std::queue<node> q, qNext;
+    count dist = 0;
+    // enqueue start nodes
+    for (; first != last; ++first) {
+        q.push(*first);
+        marked[*first] = true;
+    }
+    do {
+        const auto u = q.front();
+        q.pop();
+        // apply function
+        callBFSHandle(handle, u, dist);
+        
+        if(dist>=limit) continue;
+        
+        G.forNeighborsOf(u, [&](node v) {
+            if (!marked[v]) {
+                qNext.push(v);
+                marked[v] = true;
+            }
+        });
+        if (q.empty() && !qNext.empty()) {
+            q.swap(qNext);
+            ++dist;
+        }
+    } while (!q.empty());
+}
+
+/**
+ * Iterate over nodes in breadth-first search order starting from the given source node until
+ * a given depth limit is reached.
+ *
+ * @param G The input graph.
+ * @param source The source node.
+ * @param limit Depth limit
+ * @param handle Takes a node as input parameter.
+ */
+template <typename L>
+void BFSfromWithLimit(const Graph &G, node source, int limit, L handle) {
+    std::vector<node> startNodes({source});
+    BFSfromWithLimit(G, startNodes.begin(), startNodes.end(), limit, handle);
+}
+
+
+
 /**
  * Iterate over nodes in breadth-first search order starting from the given source node.
  *

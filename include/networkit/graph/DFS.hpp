@@ -5,6 +5,7 @@
 
 #include <stack>
 #include <vector>
+#include <utility>
 
 #include <networkit/graph/Graph.hpp>
 
@@ -33,6 +34,42 @@ void DFSfrom(const Graph &G, node source, L handle) {
         G.forNeighborsOf(u, [&](node v) {
             if (!marked[v]) {
                 s.push(v);
+                marked[v] = true;
+            }
+        });
+    } while (!s.empty());
+}
+
+
+/**
+ * Iterate over nodes in depth-first search order starting from the given source node.
+ *
+ * @param G The input graph.
+ * @param source The source node.
+ * @param limit Depth limit
+ * @param handle Takes a node and its distance from the source as input parameters.
+ */
+template <typename L>
+void DFSfromWithLimit(const Graph &G, node source, int limit, L handle) {
+    std::vector<bool> marked(G.upperNodeIdBound());
+    std::stack<std::pair<node, int>> s;
+    s.push(source); // enqueue root
+    marked[source] = true;
+    node u;
+    int depth;
+    do {
+
+        std::tie(u, depth) = s.top();
+        s.pop();
+        
+        // apply function
+        handle(u, depth);
+        
+        if(depth>=limit) continue;
+        
+        G.forNeighborsOf(u, [&](node v) {
+            if (!marked[v]) {
+                s.push(std::make_pair(v, depth+1));
                 marked[v] = true;
             }
         });

@@ -241,7 +241,8 @@ def getMaxNumberOfThreads():
 
 def enableNestedParallelism():
 	""" Enable nested parallelism for OpenMP"""
-	_enableNestedParallelism()
+	from warnings import warn
+	warn("Nested parallelism has been deprecated.")
 
 cdef extern from "<networkit/auxiliary/Random.hpp>" namespace "Aux::Random":
 
@@ -289,6 +290,15 @@ cdef object toNodePoint2DVector(const vector[pair[node, _Point2D]]& v):
 	return [(v[i].first, v[i].second.asPair()) for i in range(v.size())]
 
 cdef extern from "<networkit/graph/Graph.hpp>":
+
+	cdef struct Edge "NetworKit::Edge":
+		node u
+		node v
+
+	cdef struct WeightedEdge "NetworKit::WeightedEdge":
+		node u
+		node v
+		edgeweight weight
 
 	cdef cppclass _Graph "NetworKit::Graph":
 		_Graph() except +
@@ -366,6 +376,9 @@ cdef extern from "<networkit/graph/Graph.hpp>":
 		void DFSEdgesFrom[Callback](node r, Callback c) except +
 		bool_t checkConsistency() except +
 		_Graph subgraphFromNodes(unordered_set[node] nodes, bool_t includeOutNeighbors, bool_t includeInNeighbors) except +
+		_NodeRange nodeRange() except +
+		_EdgeRange edgeRange() except +
+		_EdgeWeightRange edgeWeightRange() except +
 		_OutNeighborRange neighborRange(node u) except +
 		_InNeighborRange inNeighborRange(node u) except +
 
@@ -428,6 +441,48 @@ cdef cppclass NodePairCallbackWrapper:
 			message = stdstring("An Exception occurred, aborting execution of iterator: {0}".format(e))
 		if (error):
 			throw_runtime_error(message)
+
+cdef extern from "<networkit/graph/Graph.hpp>":
+
+	cdef cppclass _NodeIterator "NetworKit::Graph::NodeIterator":
+		_NodeIterator operator++() except +
+		_NodeIterator operator++(int) except +
+		bool_t operator!=(const _NodeIterator) except +
+		node operator*() except +
+
+cdef extern from "<networkit/graph/Graph.hpp>":
+
+	cdef cppclass _NodeRange "NetworKit::Graph::NodeRange":
+		_NodeIterator begin() except +
+		_NodeIterator end() except +
+
+cdef extern from "<networkit/graph/Graph.hpp>":
+
+	cdef cppclass _EdgeWeightIterator "NetworKit::Graph::EdgeWeightIterator":
+		_EdgeWeightIterator operator++() except +
+		_EdgeWeightIterator operator++(int) except +
+		bool_t operator!=(const _EdgeWeightIterator) except +
+		WeightedEdge operator*() except +
+
+cdef extern from "<networkit/graph/Graph.hpp>":
+
+	cdef cppclass _EdgeWeightRange "NetworKit::Graph::EdgeWeightRange":
+		_EdgeWeightIterator begin() except +
+		_EdgeWeightIterator end() except +
+
+cdef extern from "<networkit/graph/Graph.hpp>":
+
+	cdef cppclass _EdgeIterator "NetworKit::Graph::EdgeIterator":
+		_EdgeIterator operator++() except +
+		_EdgeIterator operator++(int) except +
+		bool_t operator!=(const _EdgeIterator) except +
+		Edge operator*() except +
+
+cdef extern from "<networkit/graph/Graph.hpp>":
+
+	cdef cppclass _EdgeRange "NetworKit::Graph::EdgeRange":
+		_EdgeIterator begin() except +
+		_EdgeIterator end() except +
 
 cdef extern from "<networkit/graph/Graph.hpp>":
 
@@ -1058,7 +1113,7 @@ cdef class Graph:
 			warn("The graph is not directed, returning the neighbors!")
 			return self.neighbors(u)
 		neighborList = []
-		self.forInEdgesOf(u, lambda v : neighborList.append(v))
+		self.forInEdgesOf(u, lambda u, v, w, eid : neighborList.append(v))
 		return neighborList
 
 	def forNodes(self, object callback):
@@ -1446,17 +1501,40 @@ cdef class Graph:
 			nnodes.insert(node)
 		return Graph().setThis(self._this.subgraphFromNodes(nnodes, includeOutNeighbors, includeInNeighbors))
 
+	def iterNodes(self):
+		"""
+		Iterates over the nodes of the graph.
+		"""
+		it = self._this.nodeRange().begin()
+		while it != self._this.nodeRange().end():
+			yield dereference(it)
+			preincrement(it)
+
+	def iterEdges(self):
+		"""
+		Iterates over the edges of the graph.
+		"""
+		it = self._this.edgeRange().begin()
+		while it != self._this.edgeRange().end():
+			yield dereference(it).u, dereference(it).v
+			preincrement(it)
+
+	def iterEdgesWeights(self):
+		"""
+		Iterates over the edges of the graph and their weights.
+		"""
+		it = self._this.edgeWeightRange().begin()
+		while it != self._this.edgeWeightRange().end():
+			yield dereference(it).u, dereference(it).v, dereference(it).weight
+			preincrement(it)
+
 	def iterNeighbors(self, u):
 		"""
-		Wrapper class to iterate over a range of the neighbors of a node within
-		a for loop.
+		Iterates over a range of the neighbors of a node.
+
 		Parameters
 		----------
 		u : Node
-
-		Returns
-		-------
-		List of a node u's neighbours
 		"""
 		it = self._this.neighborRange(u).begin()
 		while it != self._this.neighborRange(u).end():
@@ -1465,15 +1543,11 @@ cdef class Graph:
 
 	def iterInNeighbors(self, u):
 		"""
-		Wrapper class to iterate over a range of the in neighbours of a node within
-		a for loop.
+		Iterates over a range of the in-neighbors of a node.
+
 		Parameters
 		----------
 		u : Node
-
-		Returns
-		-------
-		List of a node u's in neighbours
 		"""
 		it = self._this.inNeighborRange(u).begin()
 		while it != self._this.inNeighborRange(u).end():
@@ -2216,7 +2290,8 @@ cdef extern from "<networkit/graph/SpanningForest.hpp>":
 
 	cdef cppclass _SpanningForest "NetworKit::SpanningForest":
 		_SpanningForest(_Graph) except +
-		_Graph generate() except +
+		void run() nogil except +
+		_Graph getForest() except +
 
 cdef class SpanningForest:
 	""" Generates a spanning forest for a given graph
@@ -2239,8 +2314,28 @@ cdef class SpanningForest:
 	def __dealloc__(self):
 		del self._this
 
-	def generate(self):
-		return Graph().setThis(self._this.generate())
+	def run(self):
+		"""
+		Executes the algorithm.
+
+		Returns
+		-------
+		Algorithm:
+			self
+		"""
+		self._this.run()
+		return self
+
+	def getForest(self):
+		"""
+		Returns the spanning forest.
+
+		Returns
+		-------
+		networkit.Graph
+			The computed spanning forest
+		"""
+		return Graph().setThis(self._this.getForest())
 
 cdef extern from "<networkit/graph/UnionMaximumSpanningForest.hpp>":
 
@@ -3547,12 +3642,12 @@ cdef extern from "<networkit/io/GraphReader.hpp>" namespace "NetworKit::GraphRea
 	cdef enum _MultipleEdgesHandling "NetworKit::GraphReader::MultipleEdgesHandling":
 		DISCARD_EDGES,
 		SUM_WEIGHTS_UP,
-		KEEP_MINIUM_WEIGHT
+		KEEP_MINIMUM_WEIGHT
 
 class MultipleEdgesHandling:
 	DiscardEdges = DISCARD_EDGES
 	SumWeightsUp = SUM_WEIGHTS_UP
-	KeepMinimumWeight = KEEP_MINIUM_WEIGHT
+	KeepMinimumWeight = KEEP_MINIMUM_WEIGHT
 
 cdef class GraphReader:
 	""" Abstract base class for graph readers"""
@@ -7848,7 +7943,7 @@ cdef class GroupDegree(Algorithm):
 	score, this make the group degree monotone and submodular and the algorithm
 	is guaranteed to return a (1 - 1/e)-approximation of the optimal solution.
 
-	GroupDegree(G, k = 1, countGroupNodes = False)
+	GroupDegree(G, k = 1, countGroupNodes = True)
 
 	Parameters
 	----------
@@ -7859,7 +7954,7 @@ cdef class GroupDegree(Algorithm):
 	"""
 	cdef Graph _G
 
-	def __cinit__(self, Graph G, k = 1, countGroupNodes = False):
+	def __cinit__(self, Graph G, k = 1, countGroupNodes = True):
 		self._G = G
 		self._this = new _GroupDegree(G._this, k, countGroupNodes)
 
@@ -7939,6 +8034,13 @@ cdef class GroupCloseness(Algorithm):
 		The group of k nodes with highest closeness.
 	"""
 	def groupMaxCloseness(self):
+		"""
+		Returns the group with maximum closeness centrality.
+		Returns
+		-------
+		vector
+			The group of k nodes with maximum closeness centrality.
+		"""
 		return (<_GroupCloseness*>(self._this)).groupMaxCloseness()
 
 
@@ -8042,6 +8144,7 @@ cdef extern from "<networkit/centrality/ApproxGroupBetweenness.hpp>":
 	cdef cppclass _ApproxGroupBetweenness "NetworKit::ApproxGroupBetweenness" (_Algorithm):
 		_ApproxGroupBetweenness(_Graph, count, double) except +
 		vector[node] groupMaxBetweenness() except +
+		count scoreOfGroup(vector[node]) except +
 
 cdef class ApproxGroupBetweenness(Algorithm):
 	"""
@@ -8076,6 +8179,22 @@ cdef class ApproxGroupBetweenness(Algorithm):
 				The group of nodes with highest approximated group betweenness.
 		"""
 		return (<_ApproxGroupBetweenness*>(self._this)).groupMaxBetweenness()
+
+	def scoreOfGroup(self, vector[node] group):
+		"""
+		Returns the score of the given group.
+
+		Parameters
+		----------
+		group : list
+			Set of nodes.
+
+		Returns
+		-------
+		count
+			The score of the given group.
+		"""
+		return (<_ApproxGroupBetweenness*>(self._this)).scoreOfGroup(group)
 
 cdef extern from "<networkit/centrality/Closeness.hpp>" namespace "NetworKit":
 
@@ -11313,6 +11432,8 @@ cdef class SimmelianOverlapScore(EdgeScore):
 		The graph to apply the Simmelian Backbone algorithm to.
 	triangles : vector[count]
 		Previously calculated edge triangle counts on G.
+	maxRank: count
+		maximum rank that is considered for overlap calculation.
 	"""
 	def __cinit__(self, Graph G, vector[count] triangles, count maxRank):
 		self._G = G
@@ -11373,7 +11494,7 @@ cdef extern from "<networkit/sparsification/RandomEdgeScore.hpp>":
 
 cdef class RandomEdgeScore(EdgeScore):
 	"""
-	[todo]
+	Generates a random edge attribute. Each edge is assigned a random value in [0,1].
 
 	Parameters
 	----------
@@ -11679,6 +11800,16 @@ cdef extern from "<networkit/sparsification/SCANStructuralSimilarityScore.hpp>":
 		_SCANStructuralSimilarityScore(_Graph G, const vector[count]& triangles) except +
 
 cdef class SCANStructuralSimilarityScore(EdgeScore):
+	"""
+	An implementation of the SCANStructuralSimilarityScore algorithm.
+
+	Parameters
+	----------
+	G : networkit.Graph
+		The graph to apply the Local Similarity algorithm to.
+	triangles : vector[count]
+		Previously calculated edge triangle counts.
+	"""
 	cdef vector[count] _triangles
 
 	def __cinit__(self, Graph G, vector[count] triangles):

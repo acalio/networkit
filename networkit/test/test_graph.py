@@ -14,6 +14,35 @@ class TestGraph(unittest.TestCase):
 
 		return G
 
+	def testNodeIterator(self):
+		nk.setSeed(42, False)
+
+		g = self.getSmallGraph()
+
+		def doTest(g):
+			nodes = []
+			g.forNodes(lambda u: nodes.append(u))
+
+			i = 0
+			for u in g.iterNodes():
+				self.assertEqual(u, nodes[i])
+				i += 1
+
+		doTest(g)
+		g.removeNode(nk.graphtools.randomNode(g))
+		g.removeNode(nk.graphtools.randomNode(g))
+		doTest(g)
+
+	def testEdgeIterator(self):
+		for weighted in [True, False]:
+			for directed in [True, False]:
+				g = self.getSmallGraph(weighted, directed)
+				for u, v in g.iterEdges():
+					self.assertTrue(g.hasEdge(u, v))
+				for u, v, w in g.iterEdgesWeights():
+					self.assertTrue(g.hasEdge(u, v))
+					self.assertEqual(g.weight(u, v), w)
+
 	def testRemoveAllEdges(self):
 		for directed in [True, False]:
 			for weighted in [True, False]:
@@ -71,10 +100,15 @@ class TestGraph(unittest.TestCase):
 		G.addEdge(3, 2)
 		G.addEdge(1, 2)
 
-		self.assertEqual(sorted(G.neighbors(0)), [1, 2])
-		self.assertEqual(sorted(G.neighbors(1)), [2])
-		self.assertEqual(sorted(G.neighbors(2)), [])
-		self.assertEqual(sorted(G.neighbors(3)), [1, 2])
+		self.assertListEqual(sorted(G.neighbors(0)), [1, 2])
+		self.assertListEqual(sorted(G.neighbors(1)), [2])
+		self.assertListEqual(sorted(G.neighbors(2)), [])
+		self.assertListEqual(sorted(G.neighbors(3)), [1, 2])
+
+		self.assertListEqual(sorted(G.inNeighbors(0)), [])
+		self.assertListEqual(sorted(G.inNeighbors(1)), [0, 3])
+		self.assertListEqual(sorted(G.inNeighbors(2)), [0, 1, 3])
+		self.assertListEqual(sorted(G.inNeighbors(3)), [])
 
 		# Undirected
 		G = nk.Graph(4, False, False)

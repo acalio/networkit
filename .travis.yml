@@ -9,7 +9,7 @@ env:
     - export CXX_STANDARD=11
     - export MONOLITH=ON
 
-matrix:
+jobs:
   include:
     - name: macOS 10.14, Apple Clang
       env:
@@ -17,11 +17,11 @@ matrix:
         - CXX=c++
       os: osx
       osx_image: xcode10.2
-      sudo: false
       addons:
         homebrew:
           packages:
             - libomp
+          update: true
 
     - name: macOS 10.14, llvm 8
       env:
@@ -29,12 +29,12 @@ matrix:
         - CXX=/usr/local/opt/llvm@8/bin/clang++
       os: osx
       osx_image: xcode10.2
-      sudo: false
       addons:
         homebrew:
           packages:
             - llvm@8
             - libomp
+          update: true
 
     - name: macOS 10.14, GCC 8
       env:
@@ -42,11 +42,11 @@ matrix:
         - CXX=/usr/local/opt/gcc@8/bin/g++-8
       os: osx
       osx_image: xcode10.2
-      sudo: false
       addons:
         homebrew:
           packages:
             - gcc@8
+          update: true
       before_install:
         - brew link gcc@8
 
@@ -56,11 +56,11 @@ matrix:
         - CXX=c++
       os: osx
       osx_image: xcode10.2
-      sudo: false
       addons:
         homebrew:
           packages:
             - libomp
+          update: true
       script:
         - $CXX --version
         - mkdir build_non_monolith && cd "$_"
@@ -74,7 +74,6 @@ matrix:
         - CXX=/usr/local/opt/llvm@8/bin/clang++
       os: osx
       osx_image: xcode10.1
-      sudo: false
       addons:
         homebrew:
           packages:
@@ -88,11 +87,11 @@ matrix:
         - CXX=/usr/local/opt/gcc@8/bin/g++-8
       os: osx
       osx_image: xcode10.1
-      sudo: false
       addons:
         homebrew:
           packages:
             - gcc@8
+          update: true
       before_install:
         - brew link gcc@8
 
@@ -102,7 +101,6 @@ matrix:
         - CXX=c++
       os: osx
       osx_image: xcode10.1
-      sudo: false
       addons:
         homebrew:
           packages:
@@ -152,7 +150,6 @@ matrix:
         - CXX=g++-4.9
       os: linux
       dist: xenial
-      sudo: false
       addons:
         apt:
           sources:
@@ -169,7 +166,6 @@ matrix:
         - CXX=clang++-3.8
       os: linux
       dist: xenial
-      sudo: false
       addons:
         apt:
           sources:
@@ -268,10 +264,10 @@ matrix:
       deploy:
         provider: pages
         skip-cleanup: true
-        github-token: $SECRET_DEPLOY_GITHUB_PAGES
-        local-dir: core_build/htmldocs
+        token: $SECRET_DEPLOY_GITHUB_PAGES
+        local_dir: core_build/htmldocs
         repo: networkit/dev-docs
-        target-branch: master
+        target_branch: master
         on:
           branch: Dev
 
