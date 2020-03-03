@@ -3,7 +3,7 @@
  *
  *  Created on: Oct 28, 2013
  *      Author: Lukas Barth, David Weiss, Christian Staudt
- */
+*/
 
 #ifndef NETWORKIT_CENTRALITY_CORE_DECOMPOSITION_HPP_
 #define NETWORKIT_CENTRALITY_CORE_DECOMPOSITION_HPP_
@@ -27,7 +27,11 @@ class CoreDecomposition : public Centrality  {
 
 public:
 
-    /**
+
+    enum class Direction {In, Out, All};
+
+
+     /**
      * Create CoreDecomposition class for graph @a G. The graph may not contain self-loops.
      *
      * Contains the parallel algorithm by
@@ -39,7 +43,7 @@ public:
      * @param enforceBucketQueueAlgorithm If set to @c true, uses a bucket priority queue data structure. This it is generally slower than ParK but may be more flexible. TODO check
      * @param storeNodeOrder If set to @c true, the order of the nodes in ascending order of the cores is stored and can later be returned using getNodeOrder(). Enforces the sequential bucket priority queue algorithm.
      */
-    CoreDecomposition(const Graph& G, bool normalized=false, bool enforceBucketQueueAlgorithm = false, bool storeNodeOrder = false);
+    CoreDecomposition(const Graph& G, bool normalized=false, bool enforceBucketQueueAlgorithm = false, bool storeNodeOrder = false, Direction dir = Direction::All);
 
     /**
      * Perform k-core decomposition of graph passed in constructor.
@@ -92,6 +96,8 @@ public:
     }
 
 private:
+
+    Direction direction; // degree direction
 
     index maxCore; // maximum core number of any node in the graph
 

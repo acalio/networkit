@@ -14,9 +14,9 @@
 
 namespace NetworKit {
 
-CoreDecomposition::CoreDecomposition(const Graph& G, bool normalized, bool enforceBucketQueueAlgorithm, bool storeNodeOrder) :
+CoreDecomposition::CoreDecomposition(const Graph& G, bool normalized, bool enforceBucketQueueAlgorithm, bool storeNodeOrder, Direction dir):
         Centrality(G, normalized), maxCore(0), enforceBucketQueueAlgorithm(enforceBucketQueueAlgorithm),
-        storeNodeOrder(storeNodeOrder)
+        storeNodeOrder(storeNodeOrder), direction(dir)
 {
     if (G.numberOfSelfLoops()) throw std::runtime_error("Core Decomposition implementation does not support graphs with self-loops. Call Graph.removeSelfLoops() first.");
     if (storeNodeOrder) this->enforceBucketQueueAlgorithm = true;
@@ -24,7 +24,7 @@ CoreDecomposition::CoreDecomposition(const Graph& G, bool normalized, bool enfor
 }
 
 void CoreDecomposition::run() {
-    if (G.isDirected() || enforceBucketQueueAlgorithm) {
+    if (direction!=Direction::All || G.isDirected() || enforceBucketQueueAlgorithm) {
         runWithBucketQueues();
     }
     else {
@@ -193,11 +193,12 @@ void CoreDecomposition::runWithBucketQueues() {
     /* Bucket sort  by degree */
     /* 1) bucket sizes */
     G.forNodes([&](node u) {
-        count deg = G.degree(u);
+        count deg = 0;
+        if(direction !=Direction::In)
+            deg += G.degree(u);
 
-        if (directed) {
+        if (directed && direction!=Direction::Out) 
             deg += G.degreeIn(u);
-        }
 
         degree[u] = deg;
         ++degreeBegin[deg];
@@ -269,8 +270,10 @@ void CoreDecomposition::runWithBucketQueues() {
         };
 
         /* Remove u and its incident edges. */
-        G.forNeighborsOf(u, removeNeighbor);
-        if (directed) {
+        if(this->direction!=CoreDecomposition::Direction::Out)
+            G.forNeighborsOf(u, removeNeighbor);
+
+        if (directed && direction!=Direction::In) {
             /* graph is directed */
             G.forInNeighborsOf(u, removeNeighbor);
         }
